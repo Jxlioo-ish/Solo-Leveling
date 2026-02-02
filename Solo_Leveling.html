@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solo Leveling IRL</title>
+
+<style>
+:root {
+  --bg: #0f0f12;
+  --card: #1b1b22;
+  --text: #e6e6eb;
+  --muted: #9a9aa3;
+  --accent: #6b7280;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+h1, h2 {
+  margin: 0 0 10px;
+}
+
+.app {
+  padding: 20px;
+  padding-bottom: 80px;
+}
+
+.tab {
+  display: none;
+}
+
+.tab.active {
+  display: block;
+}
+
+.card {
+  background: var(--card);
+  padding: 15px;
+  border-radius: 12px;
+  margin-bottom: 12px;
+}
+
+button {
+  background: var(--accent);
+  border: none;
+  color: black;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+
+button:disabled {
+  opacity: 0.5;
+}
+
+.progress {
+  background: #2a2a33;
+  border-radius: 8px;
+  overflow: hidden;
+  height: 14px;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  transition: width 0.4s;
+}
+
+.nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #141418;
+  display: flex;
+  justify-content: space-around;
+  padding: 10px 0;
+  border-top: 1px solid #222;
+}
+
+.nav button {
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.nav button.active {
+  color: var(--accent);
+}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <!-- MISSÕES -->
+  <div id="missions" class="tab active">
+    <h1>🗡 Missões Diárias</h1>
+    <div id="missionList"></div>
+  </div>
+
+  <!-- STATUS -->
+  <div id="status" class="tab">
+    <h1>📊 Status</h1>
+    <div class="card">
+      <h2>Nível <span id="level"></span></h2>
+      <div class="progress">
+        <div id="xpBar" class="progress-bar"></div>
+      </div>
+      <p><span id="xp"></span> XP</p>
+    </div>
+
+    <div class="card">
+      <p>Força: <span id="str"></span></p>
+      <p>Resistência: <span id="res"></span></p>
+      <p>Disciplina: <span id="dis"></span></p>
+    </div>
+  </div>
+
+  <!-- RANK -->
+  <div id="rank" class="tab">
+    <h1>🏆 Rank</h1>
+    <div class="card">
+      <h2 id="rankName"></h2>
+      <p id="rankDesc"></p>
+    </div>
+  </div>
+
+</div>
+
+<!-- NAV -->
+<div class="nav">
+  <button onclick="switchTab('missions')" class="active">Missões</button>
+  <button onclick="switchTab('status')">Status</button>
+  <button onclick="switchTab('rank')">Rank</button>
+</div>
+
+<script>
+const state = JSON.parse(localStorage.getItem("solo")) || {
+  level: 1,
+  xp: 0,
+  str: 1,
+  res: 1,
+  dis: 1,
+  completed: []
+};
+
+const ranks = [
+  { name: "E", xp: 0, color: "#6b7280", desc: "Início absoluto." },
+  { name: "D", xp: 200, color: "#4b5563", desc: "Disciplina básica." },
+  { name: "C", xp: 500, color: "#2563eb", desc: "Base sólida." },
+  { name: "B", xp: 900, color: "#16a34a", desc: "Consistência visível." },
+  { name: "A", xp: 1400, color: "#d97706", desc: "Alto desempenho." },
+  { name: "S", xp: 2000, color: "#b91c1c", desc: "Elite." },
+  { name: "SS", xp: 3000, color: "#dc2626", desc: "Exceção absoluta." }
+];
+
+function xpToNext() {
+  return state.level * 100;
+}
+
+function generateMissions() {
+  const base = [
+    { text: "Flexões", stat: "str" },
+    { text: "Agachamentos", stat: "str" },
+    { text: "Corrida (min)", stat: "res" },
+    { text: "Prancha (seg)", stat: "dis" }
+  ];
+
+  return base.map((m, i) => ({
+    id: i,
+    text: `${m.text}: ${state.level * 10}`,
+    xp: 20 + state.level * 5,
+    stat: m.stat
+  }));
+}
+
+function renderMissions() {
+  const list = document.getElementById("missionList");
+  list.innerHTML = "";
+
+  generateMissions().forEach(m => {
+    const done = state.completed.includes(m.id);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <p>${m.text}</p>
+      <p>+${m.xp} XP</p>
+      <button ${done ? "disabled" : ""}>Concluir</button>
+    `;
+    card.querySelector("button").onclick = () => completeMission(m);
+    list.appendChild(card);
+  });
+}
+
+function completeMission(m) {
+  state.xp += m.xp;
+  state[m.stat]++;
+  state.completed.push(m.id);
+
+  if (state.xp >= xpToNext()) {
+    state.xp -= xpToNext();
+    state.level++;
+    state.completed = [];
+  }
+
+  save();
+  render();
+}
+
+function getRank() {
+  return [...ranks].reverse().find(r => state.level * 100 >= r.xp);
+}
+
+function renderStatus() {
+  document.getElementById("level").textContent = state.level;
+  document.getElementById("xp").textContent = `${state.xp} / ${xpToNext()}`;
+  document.getElementById("xpBar").style.width = (state.xp / xpToNext() * 100) + "%";
+
+  document.getElementById("str").textContent = state.str;
+  document.getElementById("res").textContent = state.res;
+  document.getElementById("dis").textContent = state.dis;
+}
+
+function renderRank() {
+  const r = getRank();
+  document.documentElement.style.setProperty("--accent", r.color);
+  document.getElementById("rankName").textContent = `Rank ${r.name}`;
+  document.getElementById("rankDesc").textContent = r.desc;
+}
+
+function switchTab(id) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+
+  document.querySelectorAll(".nav button").forEach(b => b.classList.remove("active"));
+  event.target.classList.add("active");
+}
+
+function save() {
+  localStorage.setItem("solo", JSON.stringify(state));
+}
+
+function render() {
+  renderMissions();
+  renderStatus();
+  renderRank();
+}
+
+render();
+</script>
+</body>
+</html>
